@@ -19,6 +19,83 @@ Live demo: **https://kenya.proto.theflywheel.in/**
 | **Glyphs** | Hosted by Protomaps — openmaptiles.org's CDN returns HTML at the moment. |
 | **Theme** | Dark background + saffron `#FF9933` outlines, modeled after [kaun-city/kaun](https://github.com/kaun-city/kaun). |
 
+## Architecture & why it's structured this way
+
+Commercial vector-tile providers (MapTiler, Mapbox, paid CARTO) ship `.pbf` tiles where labels are *data*, not pixels — switching language is a one-line style expression. But that's a paid product with an API key. The free CARTO CDN only serves *raster* tiles with labels baked into the image, which can't be re-styled or re-languaged at runtime.
+
+The trick this repo uses: **separate the basemap from the labels.** Use free raster tiles for everything pixel-y (roads, water, terrain) and overlay a vector GeoJSON layer for the text — which MapLibre will render with any language we have a `name:*` property for.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  BUILD TIME  (one-shot, ~3 min, see /scripts)                        │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  CARTO CDN  ──── pre-download 1,126 PNG tiles (Kenya bbox, z4–z10)   │
+│   dark_nolabels                                       ↓              │
+│                                                  tiles/cache/        │
+│                                                                      │
+│  Overpass API ── fetch admin_level 4/6/8 relations in Kenya          │
+│                       ↓                                              │
+│                  geometry + OSM tags (name, wikidata, …)             │
+│                       ↓                                              │
+│  Wikidata     ── pass A: batch label lookup by wikidata Q-id         │
+│                  pass B: SPARQL Kenyan admin units, match by         │
+│                          name + proximity                            │
+│                       ↓                                              │
+│                  features get name:en / name:sw / name:fr            │
+│                       ↓                                              │
+│  Formula filler─ fills remaining sub-county / ward gaps              │
+│                  "Kata ya {X}" for sw, "Quartier de {X}" for fr      │
+│                       ↓                                              │
+│                  data/kenya_admin.geojson  (single file)             │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+                                  │
+                                  ▼ nginx /var/www/... (static)
+┌──────────────────────────────────────────────────────────────────────┐
+│  RUNTIME — everything is just static files, no backend               │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Browser ── GET /tiles/{z}/{x}/{y}.png        (immutable, cached)    │
+│         ── GET /data/kenya_admin.geojson      (~13 MB gzipped)       │
+│                                                                      │
+│  MapLibre GL JS                                                      │
+│    layer 0: raster source = /tiles/...                               │
+│    layer 1: geojson source, line layer, color: saffron               │
+│    layer 2: geojson source, symbol layer, text-field:                │
+│                ['coalesce',                                          │
+│                  ['get', `name:${currentLang}`],   ← swaps on click  │
+│                  ['get', 'name:en'],                                 │
+│                  ['get', 'name']]                                    │
+│                                                                      │
+│  Language switcher: just one line                                    │
+│    map.setLayoutProperty(layerId, 'text-field', newExpr)             │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Why this works
+
+1. **Scope is admin boundaries only** — ~1,300 features, easily fits in one GeoJSON. If we wanted multilingual roads/POIs too, the GeoJSON would balloon and we'd be forced to vector tiles.
+2. **CARTO's `dark_nolabels` variant exists**, giving us a label-free backdrop. Without that, raster tiles aren't a viable starting point.
+3. **No runtime calls to CARTO.** All tiles are pre-downloaded and served from our nginx, so there are no rate limits and no per-user cost.
+4. **Glyphs come from Protomaps' free GitHub Pages CDN**, which serves proper `.pbf` font files (openmaptiles.org returns HTML right now and silently breaks text rendering).
+
+### Why we didn't pick MapTiler
+
+MapTiler ships vector tiles with `name:*` for ~15–20 languages (en, de, fr, es, it, ru, ar, zh, ja, ko, pt, nl, pl, cs, hi, …). Switching among *those* is one expression change.
+
+But the [OpenMapTiles schema](https://openmaptiles.org/schema/) MapTiler uses **does not include Swahili** (`name:sw`). For our case, the moment you need Swahili labels you're back to overlaying your own GeoJSON — same approach as this repo. So MapTiler would buy us French and nothing else, at $25–$300/mo plus an API key in the frontend.
+
+For a different country whose languages *are* in the OpenMapTiles schema, MapTiler becomes a better trade.
+
+### When this approach stops being right
+
+- You need labels on roads/POIs/landmarks, not just admin units → vector tiles
+- You need >5–10 languages → maintaining the formula filler becomes brittle
+- Your target region's name coverage in Wikidata is very thin (Kenya's was, hence the formula filler)
+- The basemap region is so large that pre-downloading is impractical (continent-scale at z<11 is fine; planet-scale or city-scale at z14+ isn't)
+
 ---
 
 ## Quick start (Docker)
