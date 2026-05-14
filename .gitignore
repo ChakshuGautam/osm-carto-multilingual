@@ -1,0 +1,14 @@
+node_modules/
+dist/
+tiles/cache/
+data/*.geojson
+data/*_cache.json
+.env
+.DS_Store
+*.log
+
+# Playwright + test artifacts
+playwright-report/
+test-results/
+screenshots/diag/
+frontend/dist/

@@ -1,0 +1,25 @@
+# Single-command bring-up:
+#
+#   docker compose up --build
+#
+# The first build takes ~3 min: it fetches Overpass + Wikidata + downloads 1,126 CARTO
+# tiles, then runs `vite build`. After that, image caches keep rebuilds fast (only the
+# bootstrap step re-runs if its inputs change).
+#
+# Map will be at http://localhost:8080/.
+
+services:
+  kenya-map:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: osm-carto-multilingual:latest
+    container_name: kenya-map
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

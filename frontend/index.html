@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kenya Map — multilingual</title>
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="lang-switcher" class="panel">
+      <span class="panel-label">Language</span>
+      <button data-lang="en" class="active">English</button>
+      <button data-lang="sw">Kiswahili</button>
+      <button data-lang="fr">Français</button>
+    </div>
+    <div id="attribution" class="panel attribution">
+      Basemap © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a> ·
+      Labels © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors
+    </div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

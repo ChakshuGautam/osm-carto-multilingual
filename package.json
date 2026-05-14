@@ -1,0 +1,24 @@
+{
+  "name": "kenya-map",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "fetch:admin": "node scripts/fetch_admin.mjs",
+    "fetch:tiles": "node scripts/fetch_tiles.mjs",
+    "enrich:wikidata": "node scripts/enrich_wikidata.mjs",
+    "fill:translations": "node scripts/fill_translations.mjs",
+    "bootstrap": "npm run fetch:admin && npm run enrich:wikidata && npm run fill:translations && npm run fetch:tiles",
+    "test": "playwright test --config tests/playwright.config.js"
+  },
+  "dependencies": {
+    "maplibre-gl": "^4.7.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "vite": "^5.4.10"
+  }
+}
